@@ -1,5 +1,6 @@
 [build]
   base = "clinic-frontend"
+  command = "cd clinic-frontend && npm install && CI=false npm run build"
   command = "npm install && CI=false npm run build"
   publish = "clinic-frontend/build"
 
