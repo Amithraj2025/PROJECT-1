@@ -1,6 +1,6 @@
 [build]
   base = "clinic-frontend"
-  command = "npm run build"
+  command = "npm install && npm run build"
   publish = "clinic-frontend/build"
 
 [[redirects]]
