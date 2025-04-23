@@ -3,54 +3,129 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
+  TextField,
+  Button,
   Paper,
   Box,
-  Button,
-  TextField,
   List,
   ListItem,
   ListItemText,
-  Grid
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Snackbar,
+  Alert,
+  Divider
 } from '@mui/material';
-import { ArrowBack as BackIcon } from '@mui/icons-material';
-import axios from 'axios';
+import { 
+  ArrowBack as BackIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon
+} from '@mui/icons-material';
 
 function PatientDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [patient, setPatient] = useState(null);
-  const [visits, setVisits] = useState([]);
-  const [visitForm, setVisitForm] = useState({
-    disease: '',
-    medication: '',
-    date: new Date().toISOString().split('T')[0]
+  const [newVisit, setNewVisit] = useState({
+    date: '',
+    diagnosis: '',
+    prescription: ''
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [visitToDelete, setVisitToDelete] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
-    const fetchData = async () => {
-      const res = await axios.get(`http://localhost:5000/api/patients/${id}`);
-      setPatient(res.data.patient);
-      setVisits(res.data.visits);
-    };
-    fetchData();
-  }, [id]);
+    const patients = JSON.parse(localStorage.getItem('patients') || '[]');
+    const foundPatient = patients.find(p => p._id === id);
+    if (foundPatient) {
+      setPatient(foundPatient);
+    } else {
+      setSnackbar({
+        open: true,
+        message: 'Patient not found',
+        severity: 'error'
+      });
+      setTimeout(() => navigate('/'), 2000);
+    }
+  }, [id, navigate]);
 
-  const handleChange = (e) => {
-    setVisitForm({ ...visitForm, [e.target.name]: e.target.value });
+  const handleVisitChange = (e) => {
+    setNewVisit({
+      ...newVisit,
+      [e.target.name]: e.target.value
+    });
   };
 
-  const handleAddVisit = async (e) => {
+  const handleAddVisit = (e) => {
     e.preventDefault();
-    await axios.post(`http://localhost:5000/api/patients/${id}/visits`, visitForm);
-    setVisitForm({ disease: '', medication: '', date: new Date().toISOString().split('T')[0] });
-    const updated = await axios.get(`http://localhost:5000/api/patients/${id}`);
-    setVisits(updated.data.visits);
+    if (!newVisit.date || !newVisit.diagnosis) {
+      setSnackbar({
+        open: true,
+        message: 'Please fill in all required fields',
+        severity: 'error'
+      });
+      return;
+    }
+
+    const visit = {
+      ...newVisit,
+      _id: Date.now().toString()
+    };
+
+    const updatedPatient = {
+      ...patient,
+      visits: [...patient.visits, visit]
+    };
+
+    // Update localStorage
+    const patients = JSON.parse(localStorage.getItem('patients') || '[]');
+    const updatedPatients = patients.map(p => 
+      p._id === patient._id ? updatedPatient : p
+    );
+    localStorage.setItem('patients', JSON.stringify(updatedPatients));
+
+    setPatient(updatedPatient);
+    setNewVisit({ date: '', diagnosis: '', prescription: '' });
+    setSnackbar({
+      open: true,
+      message: 'Visit added successfully',
+      severity: 'success'
+    });
   };
 
-  if (!patient) return <Typography>Loading...</Typography>;
+  const handleDeleteVisit = (visitId) => {
+    const updatedPatient = {
+      ...patient,
+      visits: patient.visits.filter(v => v._id !== visitId)
+    };
+
+    // Update localStorage
+    const patients = JSON.parse(localStorage.getItem('patients') || '[]');
+    const updatedPatients = patients.map(p => 
+      p._id === patient._id ? updatedPatient : p
+    );
+    localStorage.setItem('patients', JSON.stringify(updatedPatients));
+
+    setPatient(updatedPatient);
+    setSnackbar({
+      open: true,
+      message: 'Visit deleted successfully',
+      severity: 'success'
+    });
+  };
+
+  if (!patient) {
+    return null;
+  }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
+    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
         <Button
           startIcon={<BackIcon />}
@@ -60,88 +135,138 @@ function PatientDetails() {
           Back
         </Button>
         <Typography variant="h4" component="h1">
-          {patient.name}
+          Patient Details
         </Typography>
       </Box>
 
-      <Grid container spacing={4}>
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Patient Information
-            </Typography>
-            <Typography><strong>Phone:</strong> {patient.phone}</Typography>
-            <Typography><strong>Address:</strong> {patient.address}</Typography>
-          </Paper>
-        </Grid>
+      <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Personal Information
+        </Typography>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="body1">
+            <strong>Name:</strong> {patient.name}
+          </Typography>
+          <Typography variant="body1">
+            <strong>Phone:</strong> {patient.phone}
+          </Typography>
+          <Typography variant="body1">
+            <strong>Address:</strong> {patient.address || 'Not provided'}
+          </Typography>
+        </Box>
 
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, mb: 4 }}>
-            <Typography variant="h6" gutterBottom>
+        <Divider sx={{ my: 3 }} />
+
+        <Typography variant="h6" gutterBottom>
+          Add New Visit
+        </Typography>
+        <form onSubmit={handleAddVisit}>
+          <TextField
+            fullWidth
+            label="Date"
+            name="date"
+            type="date"
+            value={newVisit.date}
+            onChange={handleVisitChange}
+            margin="normal"
+            required
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            fullWidth
+            label="Diagnosis"
+            name="diagnosis"
+            value={newVisit.diagnosis}
+            onChange={handleVisitChange}
+            margin="normal"
+            required
+            multiline
+            rows={2}
+          />
+          <TextField
+            fullWidth
+            label="Prescription"
+            name="prescription"
+            value={newVisit.prescription}
+            onChange={handleVisitChange}
+            margin="normal"
+            multiline
+            rows={3}
+          />
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={<AddIcon />}
+            >
               Add Visit
-            </Typography>
-            <form onSubmit={handleAddVisit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    required
-                    label="Disease"
-                    name="disease"
-                    value={visitForm.disease}
-                    onChange={handleChange}
-                    variant="outlined"
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Medication"
-                    name="medication"
-                    value={visitForm.medication}
-                    onChange={handleChange}
-                    variant="outlined"
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    required
-                    type="date"
-                    label="Date"
-                    name="date"
-                    value={visitForm.date}
-                    onChange={handleChange}
-                    variant="outlined"
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <Button type="submit" variant="contained">
-                    Add Visit
-                  </Button>
-                </Grid>
-              </Grid>
-            </form>
-          </Paper>
+            </Button>
+          </Box>
+        </form>
 
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Visit History
-            </Typography>
-            <List>
-              {visits.map((visit) => (
-                <ListItem key={visit._id}>
+        <Divider sx={{ my: 3 }} />
+
+        <Typography variant="h6" gutterBottom>
+          Visit History
+        </Typography>
+        {patient.visits.length === 0 ? (
+          <Typography variant="body1" color="text.secondary">
+            No visits recorded yet.
+          </Typography>
+        ) : (
+          <List>
+            {patient.visits.map((visit) => (
+              <Paper
+                key={visit._id}
+                elevation={1}
+                sx={{ mb: 2, p: 2, borderRadius: 1 }}
+              >
+                <ListItem
+                  secondaryAction={
+                    <IconButton
+                      edge="end"
+                      onClick={() => handleDeleteVisit(visit._id)}
+                      color="error"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  }
+                >
                   <ListItemText
-                    primary={visit.disease}
-                    secondary={`${new Date(visit.date).toLocaleDateString()} - ${visit.medication}`}
+                    primary={new Date(visit.date).toLocaleDateString()}
+                    secondary={
+                      <>
+                        <Typography variant="body2" color="text.primary">
+                          <strong>Diagnosis:</strong> {visit.diagnosis}
+                        </Typography>
+                        {visit.prescription && (
+                          <Typography variant="body2" color="text.primary">
+                            <strong>Prescription:</strong> {visit.prescription}
+                          </Typography>
+                        )}
+                      </>
+                    }
                   />
                 </ListItem>
-              ))}
-            </List>
-          </Paper>
-        </Grid>
-      </Grid>
+              </Paper>
+            ))}
+          </List>
+        )}
+      </Paper>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }

@@ -7,100 +7,124 @@ import {
   Button,
   Paper,
   Box,
-  Grid
+  Snackbar,
+  Alert
 } from '@mui/material';
-import { ArrowBack as BackIcon } from '@mui/icons-material';
-import axios from 'axios';
+import { Save as SaveIcon } from '@mui/icons-material';
 
 function AddPatient() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', phone: '', address: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    address: ''
+  });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    try {
-      await axios.post('http://localhost:5000/api/patients', form);
+    
+    // Generate a simple ID (not recommended for production)
+    const newPatient = {
+      ...formData,
+      _id: Date.now().toString(),
+      visits: []
+    };
+
+    // Get existing patients from localStorage or use empty array
+    const existingPatients = JSON.parse(localStorage.getItem('patients') || '[]');
+    
+    // Add new patient
+    const updatedPatients = [...existingPatients, newPatient];
+    
+    // Save to localStorage
+    localStorage.setItem('patients', JSON.stringify(updatedPatients));
+
+    setSnackbar({
+      open: true,
+      message: 'Patient added successfully',
+      severity: 'success'
+    });
+
+    // Navigate back to home after a short delay
+    setTimeout(() => {
       navigate('/');
-    } catch (err) {
-      alert('Error: ' + err.response.data.error);
-    }
+    }, 1500);
   };
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 4 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-        <Button
-          startIcon={<BackIcon />}
-          onClick={() => navigate('/')}
-          sx={{ mr: 2 }}
-        >
-          Back
-        </Button>
-        <Typography variant="h4" component="h1">
-          Add Patient
+    <Container maxWidth="sm" sx={{ mt: 4, mb: 4 }}>
+      <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
+        <Typography variant="h5" component="h1" gutterBottom>
+          Add New Patient
         </Typography>
-      </Box>
-
-      <Paper sx={{ p: 4 }}>
         <form onSubmit={handleSubmit}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                required
-                label="Name"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                variant="outlined"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                required
-                label="Phone"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                variant="outlined"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Address"
-                name="address"
-                value={form.address}
-                onChange={handleChange}
-                variant="outlined"
-                multiline
-                rows={4}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => navigate('/')}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                >
-                  Add Patient
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
+          <TextField
+            fullWidth
+            label="Name"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            margin="normal"
+            required
+          />
+          <TextField
+            fullWidth
+            label="Phone"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            margin="normal"
+            required
+          />
+          <TextField
+            fullWidth
+            label="Address"
+            name="address"
+            value={formData.address}
+            onChange={handleChange}
+            margin="normal"
+            multiline
+            rows={3}
+          />
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/')}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={<SaveIcon />}
+            >
+              Save Patient
+            </Button>
+          </Box>
         </form>
       </Paper>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }

@@ -1,14 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Container,
   Typography,
   TextField,
   Button,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
   Paper,
   Box,
   IconButton,
@@ -36,41 +32,45 @@ import {
   LocationOn as LocationIcon,
   Download as DownloadIcon
 } from '@mui/icons-material';
-import axios from 'axios';
 
-// Create axios instance with default config
-const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
-  headers: {
-    'Content-Type': 'application/json'
+// Sample data
+const samplePatients = [
+  {
+    _id: '1',
+    name: 'John Doe',
+    phone: '1234567890',
+    address: '123 Main St',
+    visits: []
+  },
+  {
+    _id: '2',
+    name: 'Jane Smith',
+    phone: '0987654321',
+    address: '456 Oak Ave',
+    visits: []
   }
-});
+];
 
 function Home() {
   const theme = useTheme();
-  const [patients, setPatients] = useState([]);
+  const [patients, setPatients] = useState(() => {
+    // Initialize with sample data if localStorage is empty
+    const storedPatients = JSON.parse(localStorage.getItem('patients'));
+    if (!storedPatients || storedPatients.length === 0) {
+      localStorage.setItem('patients', JSON.stringify(samplePatients));
+      return samplePatients;
+    }
+    return storedPatients;
+  });
   const [search, setSearch] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [patientToDelete, setPatientToDelete] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const fetchPatients = useCallback(async () => {
-    try {
-      const res = await api.get(`/patients?q=${search}`);
-      setPatients(res.data);
-    } catch (err) {
-      console.error('Error fetching patients:', err.response?.data || err.message);
-      setSnackbar({
-        open: true,
-        message: `Error fetching patients: ${err.response?.data?.error || err.message}`,
-        severity: 'error'
-      });
-    }
-  }, [search]);
-
-  useEffect(() => {
-    fetchPatients();
-  }, [fetchPatients]);
+  const filteredPatients = patients.filter(patient => 
+    patient.name.toLowerCase().includes(search.toLowerCase()) ||
+    patient.phone.includes(search)
+  );
 
   const handleDeleteClick = (patient, event) => {
     event.preventDefault();
@@ -79,34 +79,20 @@ function Home() {
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteConfirm = async () => {
-    try {
-      console.log('Attempting to delete patient:', patientToDelete._id);
-      const response = await api.delete(`/patients/${patientToDelete._id}`);
-      console.log('Delete response:', response.data);
-      
-      setDeleteDialogOpen(false);
-      setSnackbar({
-        open: true,
-        message: 'Patient deleted successfully',
-        severity: 'success'
-      });
-      
-      // Update the patients list without fetching
-      setPatients(patients.filter(p => p._id !== patientToDelete._id));
-    } catch (err) {
-      console.error('Error deleting patient:', err.response?.data || err.message);
-      setSnackbar({
-        open: true,
-        message: `Error deleting patient: ${err.response?.data?.error || err.message}`,
-        severity: 'error'
-      });
-    }
+  const handleDeleteConfirm = () => {
+    const updatedPatients = patients.filter(p => p._id !== patientToDelete._id);
+    setPatients(updatedPatients);
+    localStorage.setItem('patients', JSON.stringify(updatedPatients));
+    setDeleteDialogOpen(false);
+    setSnackbar({
+      open: true,
+      message: 'Patient deleted successfully',
+      severity: 'success'
+    });
   };
 
   const handleDownload = () => {
     try {
-      // Format the data for the text file
       const formattedData = patients.map(patient => {
         return `Patient Details:
 Name: ${patient.name}
@@ -116,20 +102,13 @@ ID: ${patient._id}
 ----------------------------------------`;
       }).join('\n\n');
 
-      // Create a blob with the data
       const blob = new Blob([formattedData], { type: 'text/plain' });
-      
-      // Create a download link
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `patient_details_${new Date().toISOString().split('T')[0]}.txt`;
-      
-      // Trigger the download
       document.body.appendChild(a);
       a.click();
-      
-      // Clean up
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
@@ -234,7 +213,7 @@ ID: ${patient._id}
       </Paper>
 
       <Grid container spacing={3}>
-        {patients.map((p) => (
+        {filteredPatients.map((p) => (
           <Grid item xs={12} sm={6} md={4} key={p._id}>
             <Card 
               component={Link}
@@ -251,50 +230,41 @@ ID: ${patient._id}
                 }
               }}
             >
-              <CardContent sx={{ flexGrow: 1 }}>
+              <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: theme.palette.primary.main,
-                      width: 56,
-                      height: 56,
-                      mr: 2
-                    }}
-                  >
-                    {p.name.charAt(0).toUpperCase()}
+                  <Avatar sx={{ bgcolor: theme.palette.primary.main, mr: 2 }}>
+                    {p.name.charAt(0)}
                   </Avatar>
-                  <Box>
-                    <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
-                      {p.name}
-                    </Typography>
-                    <Chip
-                      icon={<PhoneIcon />}
-                      label={p.phone}
-                      size="small"
-                      sx={{ mt: 1 }}
-                    />
-                  </Box>
+                  <Typography variant="h6" component="div">
+                    {p.name}
+                  </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
-                  <LocationIcon color="action" sx={{ mr: 1 }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <PhoneIcon sx={{ mr: 1, color: theme.palette.text.secondary }} />
+                  <Typography variant="body2" color="text.secondary">
+                    {p.phone}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <LocationIcon sx={{ mr: 1, color: theme.palette.text.secondary }} />
                   <Typography variant="body2" color="text.secondary">
                     {p.address || 'No address provided'}
                   </Typography>
                 </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <IconButton
+                    onClick={(e) => handleDeleteClick(p, e)}
+                    sx={{
+                      color: theme.palette.error.main,
+                      '&:hover': {
+                        bgcolor: theme.palette.error.light,
+                      }
+                    }}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
               </CardContent>
-              <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                <IconButton
-                  onClick={(e) => handleDeleteClick(p, e)}
-                  sx={{ 
-                    color: theme.palette.error.main,
-                    '&:hover': {
-                      bgcolor: theme.palette.error.light,
-                    }
-                  }}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
             </Card>
           </Grid>
         ))}
@@ -303,31 +273,19 @@ ID: ${patient._id}
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 2,
-            p: 2
-          }
-        }}
       >
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Delete Patient</DialogTitle>
+        <DialogTitle>Delete Patient</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete {patientToDelete?.name}? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={() => setDeleteDialogOpen(false)}
-            sx={{ color: theme.palette.text.secondary }}
-          >
-            Cancel
-          </Button>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
           <Button 
             onClick={handleDeleteConfirm} 
-            color="error" 
+            color="error"
             variant="contained"
-            autoFocus
           >
             Delete
           </Button>
@@ -338,12 +296,11 @@ ID: ${patient._id}
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
           severity={snackbar.severity}
-          sx={{ width: '100%', borderRadius: 2 }}
+          sx={{ width: '100%' }}
         >
           {snackbar.message}
         </Alert>
