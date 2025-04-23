@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Container,
@@ -54,7 +54,7 @@ function Home() {
   const [patientToDelete, setPatientToDelete] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const fetchPatients = async () => {
+  const fetchPatients = useCallback(async () => {
     try {
       const res = await api.get(`/patients?q=${search}`);
       setPatients(res.data);
@@ -66,11 +66,11 @@ function Home() {
         severity: 'error'
       });
     }
-  };
+  }, [search]);
 
   useEffect(() => {
     fetchPatients();
-  }, [search]);
+  }, [fetchPatients]);
 
   const handleDeleteClick = (patient, event) => {
     event.preventDefault();
